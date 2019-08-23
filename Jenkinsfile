@@ -67,7 +67,7 @@ stage('build & test') {
 
 stage('deploy') {
     node('safe_cli') {
-        if (env.BRANCH_NAME == "master") {
+        if (env.BRANCH_NAME == "PR-208") {
             checkout(scm)
             sh("git fetch --tags --force")
             retrieveBuildArtifacts()
