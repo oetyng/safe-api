@@ -63,13 +63,13 @@ impl PubSeqAppendOnlyData {
         _permissions: Option<String>,
     ) -> Result<XorName> {
         debug!(
-            "Putting appendable data w/ type: {:?}, xorname: {:?}",
+            "Putting Published Sequenced AppendOnlyData w/ type: {:?}, xorname: {:?}",
             tag, name
         );
 
         let session: &Session = self.get_session()?;
         let xorname = name.unwrap_or_else(create_random_xorname);
-        info!("Xorname for storage: {:?}", &xorname);
+        info!("XOR name for storage: {:?}", &xorname);
 
         let append_only_data_address = ADataAddress::PubSeq { name: xorname, tag };
         let mut data = PubSeqAppendOnlyData::new(xorname, tag);
@@ -89,7 +89,7 @@ impl PubSeqAppendOnlyData {
         )
         .map_err(|e| {
             Error::Unexpected(format!(
-                "Failed to set permissions for the Sequenced Append Only Data: {:?}",
+                "Failed to set permissions for the Published Sequenced AppendOnlyData: {:?}",
                 e
             ))
         })?;
@@ -102,7 +102,7 @@ impl PubSeqAppendOnlyData {
         };
         data.append_owner(owner, 0).map_err(|e| {
             Error::Unexpected(format!(
-                "Failed to set the owner to the Sequenced Append Only Data: {:?}",
+                "Failed to set the owner to the Published Sequenced AppendOnlyData: {:?}",
                 e
             ))
         })?;
@@ -125,7 +125,7 @@ impl PubSeqAppendOnlyData {
                 .map(move |_| xorname)
         })
         .map_err(|e| {
-            Error::NetDataError(format!("Failed to PUT Sequenced Append Only Data: {:?}", e))
+            Error::NetDataError(format!("Failed to PUT Published Sequenced AppendOnlyData: {:?}", e))
         })
     }
 
@@ -154,7 +154,7 @@ impl PubSeqAppendOnlyData {
         })
         .map_err(|e| {
             Error::NetDataError(format!(
-                "Failed to UPDATE Sequenced Append Only Data: {:?}",
+                "Failed to UPDATE Published Sequenced AppendOnlyData: {:?}",
                 e
             ))
         })?;
@@ -167,7 +167,7 @@ impl PubSeqAppendOnlyData {
         name: XorName,
         tag: u64,
     ) -> Result<(u64, AppendOnlyDataRawData)> {
-        debug!("Getting latest seq_append_only_data for: {:?}", &name);
+        debug!("Getting latest Published Sequenced AppendOnlyData for: {:?}", &name);
 
         let session: &Session = self.get_session()?;
         let append_only_data_address = ADataAddress::PubSeq { name, tag };
@@ -177,7 +177,7 @@ impl PubSeqAppendOnlyData {
         let data_length = self
             .get_current_seq_append_only_data_version(name, tag)
             .map_err(|e| {
-                Error::NetDataError(format!("Failed to get Sequenced Append Only Data: {:?}", e))
+                Error::NetDataError(format!("Failed to get Published Sequenced AppendOnlyData: {:?}", e))
             })?;
 
         let data_entry = run(session, move |client, _app_context| {
@@ -186,7 +186,7 @@ impl PubSeqAppendOnlyData {
                 .map_err(SessionError)
         })
         .map_err(|e| {
-            Error::NetDataError(format!("Failed to get Sequenced Append Only Data: {:?}", e))
+            Error::NetDataError(format!("Failed to get Published Sequenced AppendOnlyData: {:?}", e))
         })?;
 
         let data = (data_entry.key, data_entry.value);
@@ -198,7 +198,7 @@ impl PubSeqAppendOnlyData {
         name: XorName,
         tag: u64,
     ) -> Result<u64> {
-        debug!("Getting seq appendable data, length for: {:?}", name);
+        debug!("Getting Published Sequenced AppendOnlyData, length for: {:?}", name);
 
         let session: &Session = self.get_session()?;
         let append_only_data_address = ADataAddress::PubSeq { name, tag };
@@ -210,7 +210,7 @@ impl PubSeqAppendOnlyData {
         })
         .map_err(|e| {
             Error::NetDataError(format!(
-                "Failed to get Sequenced Append Only Data indices: {:?}",
+                "Failed to get Published Sequenced AppendOnlyData indices: {:?}",
                 e
             ))
         })
@@ -224,7 +224,7 @@ impl PubSeqAppendOnlyData {
         version: u64,
     ) -> Result<AppendOnlyDataRawData> {
         debug!(
-            "Getting seq appendable data, version: {:?}, from: {:?}",
+            "Getting Published Sequenced AppendOnlyData, version: {:?}, from: {:?}",
             version, name
         );
 
@@ -241,12 +241,12 @@ impl PubSeqAppendOnlyData {
         .map_err(|err| {
             if let SessionError(SafeCoreError::DataError(SafeNdError::NoSuchEntry)) = err {
                 Error::VersionNotFound(format!(
-                    "Invalid version ({}) for Sequenced AppendOnlyData found at XoR name {}",
+                    "Invalid version ({}) for Published Sequenced AppendOnlyData found at XOR name {}",
                     version, name
                 ))
             } else {
                 Error::NetDataError(format!(
-                    "Failed to get Sequenced Append Only Data: {:?}",
+                    "Failed to get Published Sequenced AppendOnlyData: {:?}",
                     err
                 ))
             }
@@ -351,7 +351,7 @@ fn test_put_get_update_seq_append_only_data() {
     {
         Ok(_) => panic!("No error thrown when passing an outdated new version"),
         Err(Error::VersionNotFound(msg)) => assert!(msg.contains(&format!(
-            "Invalid version ({}) for Sequenced AppendOnlyData found at XoR name {}",
+            "Invalid version ({}) for Published Sequenced AppendOnlyData found at XOR name {}",
             nonexistant_version, xorname
         ))),
         err => panic!(format!("Error returned is not the expected one: {:?}", err)),

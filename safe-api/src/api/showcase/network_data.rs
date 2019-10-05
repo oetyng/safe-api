@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::SeqAppendOnlyData;
-use super::MutableData;
+use super::SeqMutableData;
 use super::PublishedImmutableData;
 
 use futures::future::Future;
@@ -24,7 +24,7 @@ use std::collections::BTreeMap;
 pub struct NetworkData {
     pub_seq_append_only_data: Option<PubSeqAppendOnlyData>,
     pub_immutable_data: Option<PubImmutableData>,
-    mutable_data: Option<MutableData>,
+    seq_mutable_data: Option<SeqMutableData>,
 }
 
 impl NetworkData {
@@ -33,7 +33,7 @@ impl NetworkData {
         { 
             pub_seq_append_only_data: PubSeqAppendOnlyData::new(session),
             pub_immutable_data: PubImmutableData::new(session),
-            mutable_data: MutableData::new(session),
+            seq_mutable_data: SeqMutableData::new(session),
         }
     }
 }

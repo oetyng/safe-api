@@ -67,7 +67,7 @@ impl PubImmutableData {
     }
 
     fn get(&self, xorname: XorName) -> Result<Vec<u8>> {
-        debug!("Fetching immutable data: {:?}", &xorname);
+        debug!("Fetching Published ImmutableData data: {:?}", &xorname);
 
         let session: &Session = self.get_session()?;
         let immd_data_addr = IDataAddress::Pub(xorname);

@@ -25,7 +25,7 @@ use safe_core::client::Client;
 use safe_nd::{
     Error as SafeNdError, MDataAction, MDataPermissionSet, MDataSeqEntryActions as MDataTransaction,
     MDataSeqValue as Value, PublicKey as SafeNdPublicKey,
-    SeqMutableData, Transaction, TransactionId, XorName,
+    SeqMutableData as SequencedMutableData, Transaction, TransactionId, XorName,
 };
 
 pub use threshold_crypto::{PublicKey, SecretKey};
@@ -35,11 +35,11 @@ use std::collections::BTreeMap;
 const NOT_CONNECTED: &str = "Application is not connected to the network";
 
 #[derive(Default)]
-pub struct MutableData {
+pub struct SeqMutableData {
     session: Option<Session>,
 }
 
-impl MutableData {
+impl SeqMutableData {
 
     fn new(session: &Session) -> Self {
         Self { session: session }
@@ -98,7 +98,7 @@ impl MutableData {
             Some(xorname) => xorname,
             None => {
                 let mut rng = OsRng::new().map_err(|err| {
-                    Error::Unexpected(format!("Failed to generate a random XoR name: {}", err))
+                    Error::Unexpected(format!("Failed to generate a random XOR name: {}", err))
                 })?;
                 let mut xorname = XorName::default();
                 rng.fill_bytes(&mut xorname.0);
@@ -118,7 +118,7 @@ impl MutableData {
         let app_pk = SafeNdPublicKey::Bls(sign_pk);
         permission_map.insert(app_pk, permission_set);
 
-        let mdata = SeqMutableData::new_with_data(
+        let mdata = SequencedMutableData::new_with_data(
             xorname,
             tag,
             BTreeMap::new(),
@@ -132,7 +132,7 @@ impl MutableData {
                 .map_err(SessionError)
                 .map(move |_| xorname)
         })
-        .map_err(|err| Error::NetDataError(format!("Failed to put mutable data: {}", err)))
+        .map_err(|err| Error::NetDataError(format!("Failed to put Sequenced MutableData: {}", err)))
     }
 
     fn get(&self, name: XorName, tag: u64) -> Result<SeqMutableData> {
@@ -140,7 +140,7 @@ impl MutableData {
         run(session, move |client, _app_context| {
             client.get_seq_mdata(name, tag).map_err(SessionError)
         })
-        .map_err(|e| Error::NetDataError(format!("Failed to get MD: {:?}", e)))
+        .map_err(|e| Error::NetDataError(format!("Failed to get Sequenced MutableData: {:?}", e)))
     }
 
     fn insert(
@@ -150,9 +150,9 @@ impl MutableData {
         key: &[u8],
         value: &[u8],
     ) -> Result<()> {
-        let entry_actions = MDataTransaction::new();
-        let entry_actions = entry_actions.ins(key.to_vec(), value.to_vec(), 0);
-        self.mutate_seq_mdata_entries(name, tag, entry_actions, "Failed to insert to SeqMD")
+        let tx = MDataTransaction::new();
+        let tx = tx.ins(key.to_vec(), value.to_vec(), 0);
+        self.mutate_seq_mdata_entries(name, tag, tx, "Failed to insert to Sequenced MutableData")
     }
 
     fn get_value(
@@ -174,13 +174,13 @@ impl MutableData {
             }
             SessionError(SafeCoreError::DataError(SafeNdError::NoSuchData)) => {
                 Error::ContentNotFound(format!(
-                    "Sequenced MutableData not found at Xor name: {}",
+                    "Sequenced MutableData not found at XOR name: {}",
                     xorname_to_hex(&name)
                 ))
             }
             SessionError(SafeCoreError::DataError(SafeNdError::NoSuchEntry)) => {
                 Error::EntryNotFound(format!(
-                    "Entry not found in Sequenced MutableData found at Xor name: {}",
+                    "Entry not found in Sequenced MutableData found at XOR name: {}",
                     xorname_to_hex(&name)
                 ))
             }
@@ -201,9 +201,9 @@ impl MutableData {
         })
         .map_err(|err| {
             if let SessionError(SafeCoreError::DataError(SafeNdError::AccessDenied)) = err {
-                Error::AccessDenied(format!("Failed to get MD at: {:?}", name))
+                Error::AccessDenied(format!("Failed to get Sequenced MutableData at: {:?}", name))
             } else {
-                Error::NetDataError(format!("Failed to get MD. {:?}", err))
+                Error::NetDataError(format!("Failed to get Sequenced MutableData. {:?}", err))
             }
         })
     }
@@ -218,7 +218,7 @@ impl MutableData {
     ) -> Result<()> {
         let tx = MDataTransaction::new();
         let tx = tx.update(key.to_vec(), value.to_vec(), version);
-        self.update_with_tx(name, tag, tx, "Failed to update SeqMD")
+        self.update_with_tx(name, tag, tx, "Failed to update Sequenced MutableData")
     }
 }
 
