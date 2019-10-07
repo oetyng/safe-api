@@ -6,6 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+pub mod data_files;
+mod data_helpers;
+pub mod map;
+pub mod network_data;
+pub mod versioned_data;
+
 mod auth;
 mod constants;
 pub mod errors;
@@ -20,6 +26,7 @@ pub mod nrs_map;
 #[cfg(not(feature = "scl-mock"))]
 mod safe_client_libs;
 mod safe_net;
+//pub mod showcase;
 pub mod wallet;
 pub mod xorurl;
 mod xorurl_media_types;

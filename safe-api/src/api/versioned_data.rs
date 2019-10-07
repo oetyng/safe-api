@@ -6,20 +6,18 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::data::{get_owner_pk, get_public_bls_key};
+use crate::api::safe_net::SafeApp;
 
-use super::helpers::{create_random_xorname, xorname_from_pk, xorname_to_hex};
+use super::data_helpers::{get_owner_pk, get_public_bls_key};
+
+use super::helpers::{create_random_xorname};
 use super::safe_net::AppendOnlyDataRawData;
-use super::{Error, ResultReturn as ReturnResult, SafeApp};
+use super::super::{Error, ResultReturn as ReturnResult};
 use futures::future::Future;
-use log::{debug, info, warn};
-use rand::rngs::OsRng;
-use rand_core::RngCore;
+use log::{debug, info};
 use safe_app::{run, App as Session, AppError::CoreError as SessionError};
 use safe_core::{CoreError as SafeCoreError};
 
-#[cfg(not(feature = "fake-auth"))]
-use super::helpers::decode_ipc_msg;
 #[cfg(feature = "fake-auth")]
 use safe_app::test_utils::create_app;
 use safe_core::client::Client;
@@ -27,7 +25,7 @@ use safe_nd::{
     AData, ADataAddress, ADataAppendOperation, ADataEntry, ADataIndex, ADataOwner,
     ADataPubPermissionSet, ADataPubPermissions, ADataUser, AppendOnlyData,
     Error as SafeNdError, PubSeqAppendOnlyData, PublicKey as SafeNdPublicKey,
-    Transaction, TransactionId, XorName,
+    XorName,
 };
 
 pub use threshold_crypto::{PublicKey, SecretKey};
@@ -36,23 +34,19 @@ use std::collections::BTreeMap;
 
 const NOT_CONNECTED: &str = "Application is not connected to the network";
 
-#[derive(Default)]
-pub struct PubSeqAppendOnlyData {
-    session: Option<Session>,
+pub struct VersionedData {
+    session: Session,
 }
 
-impl PubSeqAppendOnlyData {
+impl VersionedData {
 
-    fn new(session: &Session) -> Self {
+    pub fn new(session: Session) -> Self {
         Self { session: session }
     }
 
     // Private helper to obtain the Session instance
-    fn get_session(&self) -> Result<&Session> {
-        match &self.session {
-            Some(session) => Ok(session),
-            None => Err(Error::ConnectionError(NOT_CONNECTED.to_string())),
-        }
+    fn get_session(&self) -> &Session {
+        return &self.session;
     }
 
     fn put(
@@ -61,13 +55,13 @@ impl PubSeqAppendOnlyData {
         name: Option<XorName>,
         tag: u64,
         _permissions: Option<String>,
-    ) -> Result<XorName> {
+    ) -> ReturnResult<XorName> {
         debug!(
             "Putting Published Sequenced AppendOnlyData w/ type: {:?}, xorname: {:?}",
             tag, name
         );
 
-        let session: &Session = self.get_session()?;
+        let session: &Session = self.get_session();
         let xorname = name.unwrap_or_else(create_random_xorname);
         info!("XOR name for storage: {:?}", &xorname);
 
@@ -135,8 +129,8 @@ impl PubSeqAppendOnlyData {
         new_version: u64,
         name: XorName,
         tag: u64,
-    ) -> Result<u64> {
-        let session: &Session = self.get_session()?;
+    ) -> ReturnResult<u64> {
+        let session: &Session = self.get_session();
         run(session, move |client, _app_context| {
             let append_only_data_address = ADataAddress::PubSeq { name, tag };
             let entries_vec = the_data
@@ -166,16 +160,16 @@ impl PubSeqAppendOnlyData {
         &self,
         name: XorName,
         tag: u64,
-    ) -> Result<(u64, AppendOnlyDataRawData)> {
+    ) -> ReturnResult<(u64, AppendOnlyDataRawData)> {
         debug!("Getting latest Published Sequenced AppendOnlyData for: {:?}", &name);
 
-        let session: &Session = self.get_session()?;
+        let session: &Session = self.get_session();
         let append_only_data_address = ADataAddress::PubSeq { name, tag };
 
         debug!("Address for a_data : {:?}", append_only_data_address);
 
         let data_length = self
-            .get_current_seq_append_only_data_version(name, tag)
+            .get_version(name, tag)
             .map_err(|e| {
                 Error::NetDataError(format!("Failed to get Published Sequenced AppendOnlyData: {:?}", e))
             })?;
@@ -197,10 +191,10 @@ impl PubSeqAppendOnlyData {
         &self,
         name: XorName,
         tag: u64,
-    ) -> Result<u64> {
+    ) -> ReturnResult<u64> {
         debug!("Getting Published Sequenced AppendOnlyData, length for: {:?}", name);
 
-        let session: &Session = self.get_session()?;
+        let session: &Session = self.get_session();
         let append_only_data_address = ADataAddress::PubSeq { name, tag };
 
         run(session, move |client, _app_context| {
@@ -222,13 +216,13 @@ impl PubSeqAppendOnlyData {
         name: XorName,
         tag: u64,
         version: u64,
-    ) -> Result<AppendOnlyDataRawData> {
+    ) -> ReturnResult<AppendOnlyDataRawData> {
         debug!(
             "Getting Published Sequenced AppendOnlyData, version: {:?}, from: {:?}",
             version, name
         );
 
-        let session: &Session = self.get_session()?;
+        let session: &Session = self.get_session();
         let append_only_data_address = ADataAddress::PubSeq { name, tag };
 
         let start = ADataIndex::FromStart(version);
@@ -261,23 +255,23 @@ impl PubSeqAppendOnlyData {
 // Unit tests
 
 #[test]
-fn test_put_get_update_seq_append_only_data() {
-    use super::Safe;
-    let mut safe = Safe::new("base32z");
-    safe.connect("", Some("fake-credentials")).unwrap();
+fn test_put_get_update_seq_versioned_data() {
+    use super::super::Safe;
+    let mut scl = Safe::new("base32z");
+    scl.connect("", Some("fake-credentials")).unwrap();
 
     let key1 = b"KEY1".to_vec();
     let val1 = b"VALUE1".to_vec();
     let data1 = [(key1, val1)].to_vec();
 
     let type_tag = 12322;
-    let xorname = safe
-        .session
+    let xorname = scl
+        .safe_app
         .put_seq_append_only_data(data1, None, type_tag, None)
         .unwrap();
 
-    let (this_version, data) = safe
-        .session
+    let (this_version, data) = scl
+        .safe_app
         .get_latest_seq_append_only_data(xorname, type_tag)
         .unwrap();
 
@@ -292,12 +286,12 @@ fn test_put_get_update_seq_append_only_data() {
     let data2 = [(key2, val2)].to_vec();
     let new_version = 1;
 
-    let updated_version = safe
-        .session
+    let updated_version = scl
+        .safe_app
         .append_seq_append_only_data(data2, new_version, xorname, type_tag)
         .unwrap();
-    let (the_latest_version, data_updated) = safe
-        .session
+    let (the_latest_version, data_updated) = scl
+        .safe_app
         .get_latest_seq_append_only_data(xorname, type_tag)
         .unwrap();
 
@@ -314,8 +308,8 @@ fn test_put_get_update_seq_append_only_data() {
 
     let first_version = 0;
 
-    let first_data = safe
-        .session
+    let first_data = scl
+        .safe_app
         .get_seq_append_only_data(xorname, type_tag, first_version)
         .unwrap();
 
@@ -329,8 +323,8 @@ fn test_put_get_update_seq_append_only_data() {
     );
 
     let second_version = 1;
-    let second_data = safe
-        .session
+    let second_data = scl
+        .safe_app
         .get_seq_append_only_data(xorname, type_tag, second_version)
         .unwrap();
 
@@ -345,8 +339,8 @@ fn test_put_get_update_seq_append_only_data() {
 
     // test checking for versions that dont exist
     let nonexistant_version = 2;
-    match safe
-        .session
+    match scl
+        .safe_app
         .get_seq_append_only_data(xorname, type_tag, nonexistant_version)
     {
         Ok(_) => panic!("No error thrown when passing an outdated new version"),
@@ -359,23 +353,23 @@ fn test_put_get_update_seq_append_only_data() {
 }
 
 #[test]
-fn test_update_seq_append_only_data_error() {
-    use super::Safe;
-    let mut safe = Safe::new("base32z");
-    safe.connect("", Some("fake-credentials")).unwrap();
+fn test_update_seq_versioned_data_error() {
+    use super::super::Safe;
+    let mut scl = Safe::new("base32z");
+    scl.connect("", Some("fake-credentials")).unwrap();
 
     let key1 = b"KEY1".to_vec();
     let val1 = b"VALUE1".to_vec();
     let data1 = [(key1, val1)].to_vec();
 
     let type_tag = 12322;
-    let xorname = safe
-        .session
+    let xorname = scl
+        .safe_app
         .put_seq_append_only_data(data1, None, type_tag, None)
         .unwrap();
 
-    let (this_version, data) = safe
-        .session
+    let (this_version, data) = scl
+        .safe_app
         .get_latest_seq_append_only_data(xorname, type_tag)
         .unwrap();
 
@@ -390,8 +384,8 @@ fn test_update_seq_append_only_data_error() {
     let data2 = [(key2, val2)].to_vec();
     let wrong_new_version = 0;
 
-    match safe
-        .session
+    match scl
+        .safe_app
         .append_seq_append_only_data(data2, wrong_new_version, xorname, type_tag)
     {
         Ok(_) => panic!("No error thrown when passing an outdated new version"),

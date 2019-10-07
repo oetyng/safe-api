@@ -7,12 +7,14 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use safe_app::{run, App as Session};
-use super::{Error, ResultReturn as ReturnResult, SafeApp};
+use super::super::{Error, ResultReturn as ReturnResult};
 pub use threshold_crypto::{PublicKey, SecretKey};
 
 use safe_nd::{
     PublicKey as SafeNdPublicKey,
 };
+
+use safe_core::client::Client;
 
 pub fn get_owner_pk(session: &Session) -> ReturnResult<SafeNdPublicKey> {
     run(session, move |client, _app_context| Ok(client.owner_key())).map_err(|err| {

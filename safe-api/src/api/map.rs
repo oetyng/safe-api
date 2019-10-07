@@ -6,26 +6,23 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::data::{get_owner_pk, get_public_bls_key};
+use super::data_helpers::{get_owner_pk, get_public_bls_key};
 
-use super::helpers::{create_random_xorname, xorname_from_pk, xorname_to_hex};
+use super::helpers::{xorname_to_hex};
 use super::{Error, ResultReturn as ReturnResult, SafeApp};
 use futures::future::Future;
-use log::{debug, info, warn};
 use rand::rngs::OsRng;
 use rand_core::RngCore;
 use safe_app::{run, App as Session, AppError::CoreError as SessionError};
 use safe_core::{CoreError as SafeCoreError};
 
-#[cfg(not(feature = "fake-auth"))]
-use super::helpers::decode_ipc_msg;
 #[cfg(feature = "fake-auth")]
 use safe_app::test_utils::create_app;
 use safe_core::client::Client;
 use safe_nd::{
     Error as SafeNdError, MDataAction, MDataPermissionSet, MDataSeqEntryActions as MDataTransaction,
     MDataSeqValue as Value, PublicKey as SafeNdPublicKey,
-    SeqMutableData as SequencedMutableData, Transaction, TransactionId, XorName,
+    SeqMutableData, XorName,
 };
 
 pub use threshold_crypto::{PublicKey, SecretKey};
@@ -34,23 +31,19 @@ use std::collections::BTreeMap;
 
 const NOT_CONNECTED: &str = "Application is not connected to the network";
 
-#[derive(Default)]
-pub struct SeqMutableData {
-    session: Option<Session>,
+pub struct Map {
+    session: Session,
 }
 
-impl SeqMutableData {
+impl Map {
 
-    fn new(session: &Session) -> Self {
+    pub fn new(session: Session) -> Self {
         Self { session: session }
     }
 
     // Private helper to obtain the Session instance
-    fn get_session(&self) -> Result<&Session> {
-        match &self.session {
-            Some(session) => Ok(session),
-            None => Err(Error::ConnectionError(NOT_CONNECTED.to_string())),
-        }
+    fn get_session(&self) -> &Session {
+        return &self.session;
     }
 
     fn update_with_tx(
@@ -59,8 +52,8 @@ impl SeqMutableData {
         tag: u64,
         tx: MDataTransaction,
         error_msg: &str,
-    ) -> Result<()> {
-        let session = self.get_session()?;
+    ) -> ReturnResult<()> {
+        let session = self.get_session();
         let message = error_msg.to_string();
         run(session, move |client, _app_context| {
             client
@@ -83,8 +76,8 @@ impl SeqMutableData {
         tag: u64,
         // _data: Option<String>,
         _permissions: Option<String>,
-    ) -> Result<XorName> {
-        let session: &Session = self.get_session()?;
+    ) -> ReturnResult<XorName> {
+        let session: &Session = self.get_session();
         let owner_key_option = get_owner_pk(session)?;
         let owners = if let SafeNdPublicKey::Bls(owners) = owner_key_option {
             owners
@@ -118,7 +111,7 @@ impl SeqMutableData {
         let app_pk = SafeNdPublicKey::Bls(sign_pk);
         permission_map.insert(app_pk, permission_set);
 
-        let mdata = SequencedMutableData::new_with_data(
+        let mdata = SeqMutableData::new_with_data(
             xorname,
             tag,
             BTreeMap::new(),
@@ -135,8 +128,8 @@ impl SeqMutableData {
         .map_err(|err| Error::NetDataError(format!("Failed to put Sequenced MutableData: {}", err)))
     }
 
-    fn get(&self, name: XorName, tag: u64) -> Result<SeqMutableData> {
-        let session: &Session = self.get_session()?;
+    fn get(&self, name: XorName, tag: u64) -> ReturnResult<SeqMutableData> {
+        let session: &Session = self.get_session();
         run(session, move |client, _app_context| {
             client.get_seq_mdata(name, tag).map_err(SessionError)
         })
@@ -149,10 +142,10 @@ impl SeqMutableData {
         tag: u64,
         key: &[u8],
         value: &[u8],
-    ) -> Result<()> {
+    ) -> ReturnResult<()> {
         let tx = MDataTransaction::new();
         let tx = tx.ins(key.to_vec(), value.to_vec(), 0);
-        self.mutate_seq_mdata_entries(name, tag, tx, "Failed to insert to Sequenced MutableData")
+        self.update_with_tx(name, tag, tx, "Failed to insert to Sequenced MutableData")
     }
 
     fn get_value(
@@ -160,8 +153,8 @@ impl SeqMutableData {
         name: XorName,
         tag: u64,
         key: &[u8],
-    ) -> Result<Value> {
-        let session: &Session = self.get_session()?;
+    ) -> ReturnResult<Value> {
+        let session: &Session = self.get_session();
         let key_vec = key.to_vec();
         run(session, move |client, _app_context| {
             client
@@ -192,8 +185,8 @@ impl SeqMutableData {
         &self,
         name: XorName,
         tag: u64,
-    ) -> Result<BTreeMap<Vec<u8>, Value>> {
-        let session: &Session = self.get_session()?;
+    ) -> ReturnResult<BTreeMap<Vec<u8>, Value>> {
+        let session: &Session = self.get_session();
         run(session, move |client, _app_context| {
             client
                 .list_seq_mdata_entries(name, tag)
@@ -215,7 +208,7 @@ impl SeqMutableData {
         key: &[u8],
         value: &[u8],
         version: u64,
-    ) -> Result<()> {
+    ) -> ReturnResult<()> {
         let tx = MDataTransaction::new();
         let tx = tx.update(key.to_vec(), value.to_vec(), version);
         self.update_with_tx(name, tag, tx, "Failed to update Sequenced MutableData")
