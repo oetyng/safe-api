@@ -2781,9 +2781,8 @@ dependencies = [
 
 [[package]]
 name = "safe-nd"
-version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b9df7e282c3a46a64db93af36d419ddda09e94dc162e3dc6cddc7d954f019587"
+version = "0.7.2"
+source = "git+https://github.com/oetyng/safe-nd/?branch=replace-ad-with-sequence#459a6ab90d788e2180f5b76ae9ec02ef3487f189"
 dependencies = [
  "bincode",
  "ed25519-dalek",
@@ -2799,9 +2798,8 @@ dependencies = [
 
 [[package]]
 name = "safe_app"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34664e2841205cd13aaf99decbf12849e98c1cb89c254d4d5e58ee67278229b8"
+version = "0.12.0"
+source = "git+https://github.com/oetyng/safe_client_libs/?branch=replace-ad-with-sequence#c9c7f8f7702848c29c5d77b0f64ad9c0ba723b2f"
 dependencies = [
  "bincode",
  "env_logger 0.6.2",
@@ -2826,9 +2824,8 @@ dependencies = [
 
 [[package]]
 name = "safe_authenticator"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25e8af39e8b077758f78a0c069ed1b986397e97dd0d297a2b82464ae69e2d615"
+version = "0.12.0"
+source = "git+https://github.com/oetyng/safe_client_libs/?branch=replace-ad-with-sequence#c9c7f8f7702848c29c5d77b0f64ad9c0ba723b2f"
 dependencies = [
  "bincode",
  "env_logger 0.6.2",
@@ -2868,9 +2865,8 @@ dependencies = [
 
 [[package]]
 name = "safe_core"
-version = "0.38.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "20f6b6570e5d65e817372678a7a504351f3aacbee784105e8cf6dc88049cae60"
+version = "0.37.3"
+source = "git+https://github.com/oetyng/safe_client_libs/?branch=replace-ad-with-sequence#c9c7f8f7702848c29c5d77b0f64ad9c0ba723b2f"
 dependencies = [
  "bincode",
  "bytes",

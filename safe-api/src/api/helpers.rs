@@ -221,9 +221,9 @@ pub fn gen_timestamp_secs() -> String {
     Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true)
 }
 
-pub fn gen_timestamp_nanos() -> String {
-    Utc::now().to_rfc3339_opts(SecondsFormat::Nanos, true)
-}
+// pub fn gen_timestamp_nanos() -> String {
+//     Utc::now().to_rfc3339_opts(SecondsFormat::Nanos, true)
+// }
 
 pub fn send_authd_request<T>(endpoint: &str, method: &str, params: serde_json::Value) -> Result<T>
 where

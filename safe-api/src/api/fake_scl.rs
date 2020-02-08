@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{safe_net::AppendOnlyDataRawData, Error, Result, SafeApp};
+use super::{safe_net::SequenceRawData, Error, Result, SafeApp};
 use crate::api::helpers::{
     parse_coins_amount, parse_hex, vec_to_hex, xorname_from_pk, xorname_to_hex,
 };
@@ -37,7 +37,7 @@ type SeqMutableDataFake = BTreeMap<String, MDataSeqValue>;
 struct FakeData {
     coin_balances: BTreeMap<XorNameStr, SafeKey>,
     txs: BTreeMap<XorNameStr, TxStatusList>, // keep track of TX status per tx ID, per xorname
-    published_seq_append_only: BTreeMap<XorNameStr, AppendOnlyDataFake>, // keep a versioned map of data per xorname
+    public_sequence: BTreeMap<XorNameStr, AppendOnlyDataFake>, // keep a versioned map of data per xorname
     mutable_data: BTreeMap<XorNameStr, SeqMutableDataFake>,
     published_immutable_data: BTreeMap<XorNameStr, Vec<u8>>,
 }
@@ -264,7 +264,7 @@ impl SafeApp for SafeAppFake {
         Ok(data)
     }
 
-    fn put_seq_append_only_data(
+    fn put_sequence(
         &mut self,
         data: Vec<(Vec<u8>, Vec<u8>)>,
         name: Option<XorName>,
@@ -274,13 +274,13 @@ impl SafeApp for SafeAppFake {
         let xorname = name.unwrap_or_else(rand::random);
 
         self.fake_vault
-            .published_seq_append_only
+            .public_sequence
             .insert(xorname_to_hex(&xorname), data);
 
         Ok(xorname)
     }
 
-    fn append_seq_append_only_data(
+    fn append_to_sequence(
         &mut self,
         data: Vec<(Vec<u8>, Vec<u8>)>,
         _new_version: u64,
@@ -288,60 +288,56 @@ impl SafeApp for SafeAppFake {
         _tag: u64,
     ) -> Result<u64> {
         let xorname_hex = xorname_to_hex(&name);
-        let mut seq_append_only = match self.fake_vault.published_seq_append_only.get(&xorname_hex)
-        {
-            Some(seq_append_only) => seq_append_only.clone(),
+        let mut sequence = match self.fake_vault.public_sequence.get(&xorname_hex) {
+            Some(sequence) => sequence.clone(),
             None => {
                 return Err(Error::ContentNotFound(format!(
-                    "Sequenced AppendOnlyData not found at Xor name: {}",
+                    "Sequence not found at Xor name: {}",
                     xorname_hex
                 )))
             }
         };
 
-        seq_append_only.extend(data);
+        sequence.extend(data);
         self.fake_vault
-            .published_seq_append_only
-            .insert(xorname_hex, seq_append_only.to_vec());
+            .public_sequence
+            .insert(xorname_hex, sequence.to_vec());
 
-        Ok((seq_append_only.len() - 1) as u64)
+        Ok((sequence.len() - 1) as u64)
     }
 
-    fn get_latest_seq_append_only_data(
+    fn get_current_sequence_value(
         &self,
         name: XorName,
         _tag: u64,
-    ) -> Result<(u64, AppendOnlyDataRawData)> {
+    ) -> Result<(u64, SequenceRawData)> {
         let xorname_hex = xorname_to_hex(&name);
         debug!("Attempting to locate scl mock mdata: {}", xorname_hex);
 
-        match self.fake_vault.published_seq_append_only.get(&xorname_hex) {
-            Some(seq_append_only) => {
-                let latest_index = seq_append_only.len() - 1;
-                let last_entry = seq_append_only.get(latest_index).ok_or_else(|| {
-                    Error::EmptyContent(format!(
-                        "Empty Sequenced AppendOnlyData found at Xor name {}",
-                        xorname_hex
-                    ))
+        match self.fake_vault.public_sequence.get(&xorname_hex) {
+            Some(sequence) => {
+                let latest_index = sequence.len() - 1;
+                let last_entry = sequence.get(latest_index).ok_or_else(|| {
+                    Error::EmptyContent(format!("Empty Sequence found at Xor name {}", xorname_hex))
                 })?;
-                Ok(((seq_append_only.len() - 1) as u64, last_entry.clone()))
+                Ok(((sequence.len() - 1) as u64, last_entry.clone()))
             }
             None => Err(Error::ContentNotFound(format!(
-                "Sequenced AppendOnlyData not found at Xor name: {}",
+                "Sequence not found at Xor name: {}",
                 xorname_hex
             ))),
         }
     }
 
     #[allow(dead_code)]
-    fn get_current_seq_append_only_data_version(&self, name: XorName, _tag: u64) -> Result<u64> {
-        debug!("Getting seq appendable data, length for: {:?}", name);
+    fn get_current_sequence_version(&self, name: XorName, _tag: u64) -> Result<u64> {
+        debug!("Getting Sequence version for: {:?}", name);
         let xorname_hex = xorname_to_hex(&name);
-        let length = match self.fake_vault.published_seq_append_only.get(&xorname_hex) {
-            Some(seq_append_only) => seq_append_only.len(),
+        let length = match self.fake_vault.public_sequence.get(&xorname_hex) {
+            Some(sequence) => sequence.len(),
             None => {
                 return Err(Error::ContentNotFound(format!(
-                    "Sequenced AppendOnlyData not found at Xor name: {}",
+                    "Sequence not found at Xor name: {}",
                     xorname_hex
                 )))
             }
@@ -351,25 +347,25 @@ impl SafeApp for SafeAppFake {
         Ok((length - 1) as u64)
     }
 
-    fn get_seq_append_only_data(
+    fn get_sequence_value_at(
         &self,
         name: XorName,
         _tag: u64,
         version: u64,
-    ) -> Result<AppendOnlyDataRawData> {
+    ) -> Result<SequenceRawData> {
         let xorname_hex = xorname_to_hex(&name);
-        match self.fake_vault.published_seq_append_only.get(&xorname_hex) {
-            Some(seq_append_only) => {
-                if version >= seq_append_only.len() as u64 {
+        match self.fake_vault.public_sequence.get(&xorname_hex) {
+            Some(sequence) => {
+                if version >= sequence.len() as u64 {
                     Err(Error::VersionNotFound(format!(
-                        "Invalid version ({}) for Sequenced AppendOnlyData found at Xor name {}",
+                        "Invalid version ({}) for Sequence found at Xor name {}",
                         version, name
                     )))
                 } else {
                     let index = version as usize;
-                    let entry = seq_append_only.get(index).ok_or_else(|| {
+                    let entry = sequence.get(index).ok_or_else(|| {
                         Error::EmptyContent(format!(
-                            "Empty Sequenced AppendOnlyData found at Xor name {}",
+                            "Empty Sequence found at Xor name {}",
                             xorname_hex
                         ))
                     })?;
@@ -378,7 +374,7 @@ impl SafeApp for SafeAppFake {
                 }
             }
             None => Err(Error::ContentNotFound(format!(
-                "Sequenced AppendOnlyData not found at Xor name: {}",
+                "Sequence not found at Xor name: {}",
                 xorname_hex
             ))),
         }

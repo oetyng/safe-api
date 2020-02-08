@@ -12,7 +12,7 @@ use safe_nd::{Coins, MDataSeqValue, SeqMutableData, Transaction, TransactionId, 
 use std::collections::BTreeMap;
 use threshold_crypto::{PublicKey, SecretKey};
 
-pub type AppendOnlyDataRawData = (Vec<u8>, Vec<u8>);
+pub type SequenceRawData = Vec<u8>;
 
 pub trait SafeApp {
     fn new() -> Self;
@@ -52,36 +52,33 @@ pub trait SafeApp {
 
     fn files_get_published_immutable(&self, xorname: XorName) -> Result<Vec<u8>>;
 
-    fn put_seq_append_only_data(
+    fn put_sequence(
         &mut self,
-        data: Vec<(Vec<u8>, Vec<u8>)>,
+        values: Vec<Vec<u8>>,
         name: Option<XorName>,
         tag: u64,
         permissions: Option<String>,
     ) -> Result<XorName>;
 
-    fn append_seq_append_only_data(
+    fn append_to_sequence(
         &mut self,
-        data: Vec<(Vec<u8>, Vec<u8>)>,
-        new_version: u64,
+        data: Vec<Vec<u8>>,
+        expected_version: u64,
         name: XorName,
         tag: u64,
     ) -> Result<u64>;
 
-    fn get_latest_seq_append_only_data(
-        &self,
-        name: XorName,
-        tag: u64,
-    ) -> Result<(u64, AppendOnlyDataRawData)>;
+    fn get_current_sequence_value(&self, name: XorName, tag: u64)
+        -> Result<(u64, SequenceRawData)>;
 
-    fn get_current_seq_append_only_data_version(&self, name: XorName, tag: u64) -> Result<u64>;
+    fn get_current_sequence_version(&self, name: XorName, tag: u64) -> Result<u64>;
 
-    fn get_seq_append_only_data(
+    fn get_sequence_value_at(
         &self,
         name: XorName,
         tag: u64,
         version: u64,
-    ) -> Result<AppendOnlyDataRawData>;
+    ) -> Result<SequenceRawData>;
 
     fn put_seq_mutable_data(
         &mut self,

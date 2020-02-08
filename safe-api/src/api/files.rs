@@ -13,9 +13,14 @@ use super::{
         FAKE_RDF_PREDICATE_CREATED, FAKE_RDF_PREDICATE_LINK, FAKE_RDF_PREDICATE_MODIFIED,
         FAKE_RDF_PREDICATE_SIZE, FAKE_RDF_PREDICATE_TYPE,
     },
-    helpers::{gen_timestamp_nanos, gen_timestamp_secs},
+    helpers::gen_timestamp_secs, // gen_timestamp_nanos
     xorurl::{SafeContentType, SafeDataType},
-    Error, Result, Safe, SafeApp, XorUrl, XorUrlEncoder,
+    Error,
+    Result,
+    Safe,
+    SafeApp,
+    XorUrl,
+    XorUrlEncoder,
 };
 use log::{debug, info, warn};
 use mime_guess;
@@ -80,14 +85,11 @@ impl Safe {
                 ))
             })?;
 
-            let now = gen_timestamp_nanos();
-            let files_container_data = vec![(
-                now.into_bytes().to_vec(),
-                serialised_files_map.as_bytes().to_vec(),
-            )];
+            //let now = gen_timestamp_nanos();
+            let files_container_data = vec![serialised_files_map.as_bytes().to_vec()]; // now.into_bytes().to_vec()
 
             // Store the FilesContainer in a Published AppendOnlyData
-            let xorname = self.safe_app.put_seq_append_only_data(
+            let xorname = self.safe_app.put_sequence(
                 files_container_data,
                 None,
                 FILES_CONTAINER_TYPE_TAG,
@@ -129,15 +131,13 @@ impl Safe {
         // Check if the URL specifies a specific version of the content or simply the latest available
         let data = xorurl_encoder.content_version().map_or_else(
             || {
-                self.safe_app.get_latest_seq_append_only_data(
-                    xorurl_encoder.xorname(),
-                    xorurl_encoder.type_tag(),
-                )
+                self.safe_app
+                    .get_current_sequence_value(xorurl_encoder.xorname(), xorurl_encoder.type_tag())
             },
             |content_version| {
-                let (key, value) = self
+                let value = self
                     .safe_app
-                    .get_seq_append_only_data(
+                    .get_sequence_value_at(
                         xorurl_encoder.xorname(),
                         xorurl_encoder.type_tag(),
                         content_version,
@@ -152,12 +152,12 @@ impl Safe {
                             err
                         }
                     })?;
-                Ok((content_version, (key, value)))
+                Ok((content_version, value))
             },
         );
 
         match data {
-            Ok((version, (_key, value))) => {
+            Ok((version, value)) => {
                 debug!("Files map retrieved.... v{:?}", &version);
                 // TODO: use RDF format and deserialise it
                 let files_map = serde_json::from_str(&String::from_utf8_lossy(&value.as_slice()))
@@ -401,15 +401,12 @@ impl Safe {
                 ))
             })?;
 
-            let now = gen_timestamp_nanos();
-            let files_container_data = vec![(
-                now.into_bytes().to_vec(),
-                serialised_files_map.as_bytes().to_vec(),
-            )];
+            //let now = gen_timestamp_nanos();
+            let files_container_data = vec![serialised_files_map.as_bytes().to_vec()]; // now.into_bytes().to_vec()
 
             let xorname = xorurl_encoder.xorname();
             let type_tag = xorurl_encoder.type_tag();
-            let new_version = self.safe_app.append_seq_append_only_data(
+            let new_version = self.safe_app.append_to_sequence(
                 files_container_data,
                 current_version + 1,
                 xorname,
