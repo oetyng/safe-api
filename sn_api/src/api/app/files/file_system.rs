@@ -19,7 +19,7 @@ use walkdir::{DirEntry, WalkDir};
 
 const MAX_RECURSIVE_DEPTH: usize = 10_000;
 
-// Upload a files to the Network as a Public Blob
+// Upload a files to the Network as a public chunk
 pub(crate) async fn upload_file_to_net(
     safe: &mut Safe,
     path: &Path,
@@ -31,14 +31,14 @@ pub(crate) async fn upload_file_to_net(
 
     let mime_type = mime_guess::from_path(&path);
     match safe
-        .files_store_public_blob(&data, mime_type.first_raw(), dry_run)
+        .files_store_public_chunk(&data, mime_type.first_raw(), dry_run)
         .await
     {
         Ok(xorurl) => Ok(xorurl),
         Err(err) => {
             // Let's then upload it and set media-type to be simply raw content
             if let Error::InvalidMediaType(_) = err {
-                safe.files_store_public_blob(&data, None, dry_run).await
+                safe.files_store_public_chunk(&data, None, dry_run).await
             } else {
                 Err(err)
             }

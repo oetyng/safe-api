@@ -19,7 +19,7 @@ use std::{collections::BTreeMap, fs, path::Path};
 // To use for mapping files names (with path in a flattened hierarchy) to FileItems
 pub type FilesMap = BTreeMap<String, FileItem>;
 
-// Each FileItem contains file metadata and the link to the file's Blob XOR-URL
+// Each FileItem contains file metadata and the link to the file's chunk XOR-URL
 pub type FileItem = BTreeMap<String, String>;
 
 // A trait to get an key attr and return an API Result

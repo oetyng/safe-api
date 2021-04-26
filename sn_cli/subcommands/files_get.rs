@@ -422,7 +422,7 @@ async fn files_container_get_files(
         SafeData::FilesContainer {
             version, files_map, ..
         } => (version, files_map),
-        SafeData::PublicBlob { metadata, .. } => {
+        SafeData::PublicChunk { metadata, .. } => {
             if let Some(file_item) = metadata {
                 let mut files_map = FilesMap::new();
                 files_map.insert("".to_string(), file_item);
@@ -755,7 +755,7 @@ async fn download_file_from_net(
         };
         let range = Some((Some(start), Some(end)));
         // gets public or private, based on xorurl type
-        let filedata = files_get_blob(safe, &xorurl, range).await?;
+        let filedata = files_get_chunk(safe, &xorurl, range).await?;
         bytes_written += stream_write(&mut stream, &filedata, &path)? as u64;
         rcvd += filedata.len() as u64;
         trace!(
@@ -825,21 +825,21 @@ fn create_dir_all(dir_path: &Path) -> Result<()> {
         .with_context(|| format!("Couldn't create path: \"{}\"", dir_path.display(),))
 }
 
-/// # Get Private Blob
-/// Get private immutable data blobs from the network.
-async fn files_get_private_blob(_safe: &Safe, _url: &str, _range: Range) -> Result<Vec<u8>> {
+/// # Get private chunk
+/// Get private immutable data chunks from the network.
+async fn files_get_private_chunk(_safe: &Safe, _url: &str, _range: Range) -> Result<Vec<u8>> {
     unimplemented!();
 }
 
-/// # Get Public or Private Blob
-/// Get immutable data blobs from the network.
-pub async fn files_get_blob(safe: &mut Safe, url: &str, range: Range) -> Result<Vec<u8>> {
+/// # Get private or private chunk
+/// Get immutable data chunks from the network.
+pub async fn files_get_chunk(safe: &mut Safe, url: &str, range: Range) -> Result<Vec<u8>> {
     match SafeUrl::from_url(&url)?.data_type() {
-        SafeDataType::PublicBlob => {
-            let pub_blob = safe.files_get_public_blob(&url, range).await?;
-            Ok(pub_blob)
+        SafeDataType::PublicChunk => {
+            let pub_chunk = safe.files_get_public_chunk(&url, range).await?;
+            Ok(pub_chunk)
         }
-        SafeDataType::PrivateBlob => files_get_private_blob(&safe, &url, range).await,
+        SafeDataType::PrivateChunk => files_get_private_chunk(&safe, &url, range).await,
         _ => Err(anyhow!("URL target is not immutable data")),
     }
 }

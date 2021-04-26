@@ -13,7 +13,7 @@ use hex::encode;
 use log::{debug, info};
 use sn_client::{Client, Error as ClientError, ErrorMessage, TransfersError};
 use sn_data_types::{
-    BlobAddress, Error as SafeNdError, Keypair, Map, MapAction, MapAddress, MapEntryActions,
+    ChunkAddress, Error as SafeNdError, Keypair, Map, MapAction, MapAddress, MapEntryActions,
     MapPermissionSet, MapSeqEntryActions, MapSeqValue, MapValue, PublicKey, SequenceAddress,
     SequencePrivatePermissions, SequencePublicPermissions, SequenceUser, Token,
 };
@@ -196,41 +196,41 @@ impl SafeAppClient {
         Ok(dot_counter)
     }
 
-    // // === Blob operations ===
-    pub async fn store_public_blob(&self, data: &[u8], dry_run: bool) -> Result<XorName> {
+    // // === chunk operations ===
+    pub async fn store_public_chunk(&self, data: &[u8], dry_run: bool) -> Result<XorName> {
         let address = if dry_run {
-            let (_, address) = Client::blob_data_map(data.to_vec(), None).await?;
+            let (_, address) = Client::chunk_data_map(data.to_vec(), None).await?;
             address
         } else {
             let client = self.get_safe_client()?;
             client
-                .store_public_blob(data)
+                .store_public_chunk(data)
                 .await
-                .map_err(|e| Error::NetDataError(format!("Failed to PUT Public Blob: {:?}", e)))?
+                .map_err(|e| Error::NetDataError(format!("Failed to PUT public chunk: {:?}", e)))?
         };
 
         Ok(*address.name())
     }
 
-    pub async fn get_public_blob(&self, xorname: XorName, range: Range) -> Result<Vec<u8>> {
+    pub async fn get_public_chunk(&self, xorname: XorName, range: Range) -> Result<Vec<u8>> {
         debug!("Fetching immutable data: {:?}", &xorname);
 
         let client = self.get_safe_client()?;
-        let blob_address = BlobAddress::Public(xorname);
+        let chunk_address = ChunkAddress::Public(xorname);
         let data = if let Some((start, end)) = range {
             let len = if let Some(end_index) = end {
                 Some(end_index - start.unwrap_or(0))
             } else {
                 None
             };
-            client.read_blob(blob_address, start, len).await
+            client.read_chunk(chunk_address, start, len).await
         } else {
-            client.read_blob(blob_address, None, None).await
+            client.read_chunk(chunk_address, None, None).await
         }
-        .map_err(|e| Error::NetDataError(format!("Failed to GET Public Blob: {:?}", e)))?;
+        .map_err(|e| Error::NetDataError(format!("Failed to GET public chunk: {:?}", e)))?;
 
         debug!(
-            "Public Blob data successfully retrieved from: {:?}",
+            "public chunk data successfully retrieved from: {:?}",
             &xorname
         );
 

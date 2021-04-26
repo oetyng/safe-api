@@ -58,7 +58,7 @@ fn calling_safe_cat() -> Result<()> {
         safeurl.content_type(),
         SafeContentType::MediaType("text/markdown".to_string())
     );
-    assert_eq!(safeurl.data_type(), SafeDataType::PublicBlob);
+    assert_eq!(safeurl.data_type(), SafeDataType::PublicChunk);
     Ok(())
 }
 
@@ -142,7 +142,7 @@ fn calling_safe_cat_hexdump() -> Result<()> {
         safeurl.content_type(),
         SafeContentType::MediaType("text/markdown".to_string())
     );
-    assert_eq!(safeurl.data_type(), SafeDataType::PublicBlob);
+    assert_eq!(safeurl.data_type(), SafeDataType::PublicChunk);
     Ok(())
 }
 

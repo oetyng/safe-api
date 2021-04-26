@@ -131,8 +131,8 @@ impl SafeContentType {
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub enum SafeDataType {
     SafeKey = 0x00,
-    PublicBlob = 0x01,
-    PrivateBlob = 0x02,
+    PublicChunk = 0x01,
+    PrivateChunk = 0x02,
     PublicSequence = 0x03,
     PrivateSequence = 0x04,
     SeqMap = 0x05,
@@ -149,8 +149,8 @@ impl SafeDataType {
     pub fn from_u64(value: u64) -> Result<Self> {
         match value {
             0 => Ok(Self::SafeKey),
-            1 => Ok(Self::PublicBlob),
-            2 => Ok(Self::PrivateBlob),
+            1 => Ok(Self::PublicChunk),
+            2 => Ok(Self::PrivateChunk),
             3 => Ok(Self::PublicSequence),
             4 => Ok(Self::PrivateSequence),
             5 => Ok(Self::SeqMap),
@@ -477,8 +477,8 @@ impl SafeUrl {
 
         let data_type = match xorurl_bytes[3] {
             0 => SafeDataType::SafeKey,
-            1 => SafeDataType::PublicBlob,
-            2 => SafeDataType::PrivateBlob,
+            1 => SafeDataType::PublicChunk,
+            2 => SafeDataType::PrivateChunk,
             3 => SafeDataType::PublicSequence,
             4 => SafeDataType::PrivateSequence,
             5 => SafeDataType::SeqMap,
@@ -972,8 +972,8 @@ impl SafeUrl {
         )
     }
 
-    // A non-member Blob encoder function for convenience
-    pub fn encode_blob(
+    // A non-member chunk encoder function for convenience
+    pub fn encode_chunk(
         xor_name: XorName,
         content_type: SafeContentType,
         base: XorUrlBase,
@@ -982,7 +982,7 @@ impl SafeUrl {
             xor_name,
             None,
             0,
-            SafeDataType::PublicBlob,
+            SafeDataType::PublicChunk,
             content_type,
             None,
             None,
@@ -1318,7 +1318,7 @@ mod tests {
             xor_name,
             None,
             0xa632_3c4d_4a32,
-            SafeDataType::PublicBlob,
+            SafeDataType::PublicChunk,
             SafeContentType::Raw,
             None,
             None,
@@ -1336,7 +1336,7 @@ mod tests {
     #[test]
     fn test_safeurl_base32z_encoding() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
-        let xorurl = SafeUrl::encode_blob(xor_name, SafeContentType::Raw, XorUrlBase::Base32z)?;
+        let xorurl = SafeUrl::encode_chunk(xor_name, SafeContentType::Raw, XorUrlBase::Base32z)?;
         let base32z_xorurl = "safe://hyryyyyjtge3uepjsghhd1cbtge3uepjsghhd1cbtge3uepjsghhd1cbtge";
         assert_eq!(xorurl, base32z_xorurl);
         Ok(())
@@ -1369,7 +1369,7 @@ mod tests {
     fn test_safeurl_default_base_encoding() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
         let base32z_xorurl = "safe://hyryyyyjtge3uepjsghhd1cbtge3uepjsghhd1cbtge3uepjsghhd1cbtge";
-        let xorurl = SafeUrl::encode_blob(xor_name, SafeContentType::Raw, DEFAULT_XORURL_BASE)?;
+        let xorurl = SafeUrl::encode_chunk(xor_name, SafeContentType::Raw, DEFAULT_XORURL_BASE)?;
         assert_eq!(xorurl, base32z_xorurl);
         Ok(())
     }
@@ -1387,7 +1387,7 @@ mod tests {
             xor_name,
             None,
             type_tag,
-            SafeDataType::PublicBlob,
+            SafeDataType::PublicChunk,
             SafeContentType::Raw,
             Some(subdirs),
             Some(vec!["subname".to_string()]),
@@ -1402,7 +1402,7 @@ mod tests {
         assert_eq!(XOR_URL_VERSION_1, safeurl.encoding_version());
         assert_eq!(xor_name, safeurl.xorname());
         assert_eq!(type_tag, safeurl.type_tag());
-        assert_eq!(SafeDataType::PublicBlob, safeurl.data_type());
+        assert_eq!(SafeDataType::PublicChunk, safeurl.data_type());
         assert_eq!(SafeContentType::Raw, safeurl.content_type());
         assert_eq!(Some(content_version), safeurl.content_version());
         assert_eq!(query_string_v, safeurl.query_string());
@@ -1445,7 +1445,7 @@ mod tests {
             xor_name,
             None,
             type_tag,
-            SafeDataType::PublicBlob,
+            SafeDataType::PublicChunk,
             SafeContentType::NrsMapContainer,
             None,
             Some(vec!["sub".to_string()]),
@@ -1476,7 +1476,7 @@ mod tests {
     #[test]
     fn test_safeurl_encoding_decoding_with_media_type() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
-        let xorurl = SafeUrl::encode_blob(
+        let xorurl = SafeUrl::encode_chunk(
             xor_name,
             SafeContentType::MediaType("text/html".to_string()),
             XorUrlBase::Base32z,
@@ -1513,7 +1513,7 @@ mod tests {
     #[test]
     fn test_safeurl_too_short() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
-        let xorurl = SafeUrl::encode_blob(
+        let xorurl = SafeUrl::encode_chunk(
             xor_name,
             SafeContentType::MediaType("text/html".to_string()),
             XorUrlBase::Base32z,

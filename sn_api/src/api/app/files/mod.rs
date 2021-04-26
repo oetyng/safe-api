@@ -91,7 +91,7 @@ impl Safe {
         let xorurl = if dry_run {
             "".to_string()
         } else {
-            // Store the serialised FilesMap in a Public Blob
+            // Store the serialised FilesMap in a public chunk
             let files_map_xorurl = self.store_files_map(&files_map).await?;
 
             // Store the FilesContainer in a Public Sequence, putting the
@@ -162,7 +162,7 @@ impl Safe {
                 )?;
 
                 // Using the FilesMap XOR-URL we can now fetch the FilesMap and deserialise it
-                let serialised_files_map = self.fetch_public_blob(&files_map_xorurl, None).await?;
+                let serialised_files_map = self.fetch_public_chunk(&files_map_xorurl, None).await?;
                 let files_map =
                     serde_json::from_slice(serialised_files_map.as_slice()).map_err(|err| {
                         Error::ContentError(format!(
@@ -383,7 +383,7 @@ impl Safe {
             validate_files_add_params(self, "", url, update_nrs).await?;
 
         let dest_path = safe_url.path();
-        let new_file_xorurl = self.files_store_public_blob(data, None, false).await?;
+        let new_file_xorurl = self.files_store_public_chunk(data, None, false).await?;
 
         // Let's act according to if it's a local file path or a safe:// location
         let (processed_files, new_files_map, success_count) =
@@ -495,7 +495,7 @@ impl Safe {
             current_version + 1
         } else {
             // The FilesContainer is updated by adding an entry containing the link to
-            // the Blob with the serialised new version of the FilesMap.
+            // the chunk with the serialised new version of the FilesMap.
             let files_map_xorurl = self.store_files_map(new_files_map).await?;
 
             let xorname = safe_url.xorname();
@@ -522,8 +522,8 @@ impl Safe {
         Ok(version)
     }
 
-    /// # Put a Public Blob
-    /// Put data blobs onto the network.
+    /// # Put a public chunk
+    /// Put data chunks onto the network.
     ///
     /// ## Example
     /// ```
@@ -532,12 +532,12 @@ impl Safe {
     /// # async_std::task::block_on(async {
     /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
     ///     let data = b"Something super good";
-    ///     let xorurl = safe.files_store_public_blob(data, Some("text/plain"), false).await.unwrap();
-    ///     let received_data = safe.files_get_public_blob(&xorurl, None).await.unwrap();
+    ///     let xorurl = safe.files_store_public_chunk(data, Some("text/plain"), false).await.unwrap();
+    ///     let received_data = safe.files_get_public_chunk(&xorurl, None).await.unwrap();
     ///     assert_eq!(received_data, data);
     /// # });
     /// ```
-    pub async fn files_store_public_blob(
+    pub async fn files_store_public_chunk(
         &mut self,
         data: &[u8],
         media_type: Option<&str>,
@@ -558,13 +558,13 @@ impl Safe {
         )?;
 
         // TODO: do we want ownership from other PKs yet?
-        let xorname = self.safe_client.store_public_blob(&data, dry_run).await?;
+        let xorname = self.safe_client.store_public_chunk(&data, dry_run).await?;
 
-        SafeUrl::encode_blob(xorname, content_type, self.xorurl_base)
+        SafeUrl::encode_chunk(xorname, content_type, self.xorurl_base)
     }
 
-    /// # Get a Public Blob
-    /// Put data blobs onto the network.
+    /// # Get a public chunk
+    /// Put data chunks onto the network.
     ///
     /// ## Example
     /// ```
@@ -573,32 +573,32 @@ impl Safe {
     /// # async_std::task::block_on(async {
     /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
     ///     let data = b"Something super good";
-    ///     let xorurl = safe.files_store_public_blob(data, None, false).await.unwrap();
-    ///     let received_data = safe.files_get_public_blob(&xorurl, None).await.unwrap();
+    ///     let xorurl = safe.files_store_public_chunk(data, None, false).await.unwrap();
+    ///     let received_data = safe.files_get_public_chunk(&xorurl, None).await.unwrap();
     ///     assert_eq!(received_data, data);
     /// # });
     /// ```
-    pub async fn files_get_public_blob(&mut self, url: &str, range: Range) -> Result<Vec<u8>> {
+    pub async fn files_get_public_chunk(&mut self, url: &str, range: Range) -> Result<Vec<u8>> {
         // TODO: do we want ownership from other PKs yet?
         let (safe_url, _) = self.parse_and_resolve_url(url).await?;
-        self.fetch_public_blob(&safe_url, range).await
+        self.fetch_public_chunk(&safe_url, range).await
     }
 
-    /// Fetch an Blob from a SafeUrl without performing any type of URL resolution
-    pub(crate) async fn fetch_public_blob(
+    /// Fetch an chunk from a SafeUrl without performing any type of URL resolution
+    pub(crate) async fn fetch_public_chunk(
         &mut self,
         safe_url: &SafeUrl,
         range: Range,
     ) -> Result<Vec<u8>> {
         self.safe_client
-            .get_public_blob(safe_url.xorname(), range)
+            .get_public_chunk(safe_url.xorname(), range)
             .await
     }
 
-    // Private helper to serialise a FilesMap and store it in a Public Blob
+    // Private helper to serialise a FilesMap and store it in a public chunk
     async fn store_files_map(&mut self, files_map: &FilesMap) -> Result<String> {
         // The FilesMapContainer is a Sequence where each NRS Map version is
-        // an entry containing the XOR-URL of the Blob that contains the serialised NrsMap.
+        // an entry containing the XOR-URL of the chunk that contains the serialised NrsMap.
         // TODO: use RDF format
         let serialised_files_map = serde_json::to_string(&files_map).map_err(|err| {
             Error::Serialisation(format!(
@@ -607,7 +607,7 @@ impl Safe {
             ))
         })?;
         let files_map_xorurl = self
-            .files_store_public_blob(serialised_files_map.as_bytes(), None, false)
+            .files_store_public_chunk(serialised_files_map.as_bytes(), None, false)
             .await?;
 
         Ok(files_map_xorurl)
@@ -652,10 +652,10 @@ async fn validate_files_add_params(
     // Let's act according to if it's a local file path or a safe:// location
     if source_file.starts_with("safe://") {
         let source_safe_url = Safe::parse_url(source_file)?;
-        if source_safe_url.data_type() != SafeDataType::PublicBlob {
+        if source_safe_url.data_type() != SafeDataType::PublicChunk {
             return Err(Error::InvalidInput(format!(
                 "The source URL should target a file ('{}'), but the URL provided targets a '{}'",
-                SafeDataType::PublicBlob,
+                SafeDataType::PublicChunk,
                 source_safe_url.content_type()
             )));
         }
@@ -1066,7 +1066,7 @@ fn files_map_remove_path(
     Ok((processed_files, new_files_map, success_count))
 }
 
-// Upload a files to the Network as a Public Blob
+// Upload a files to the Network as a public chunk
 async fn upload_file_to_net(safe: &mut Safe, path: &Path, dry_run: bool) -> Result<XorUrl> {
     let data = fs::read(path).map_err(|err| {
         Error::InvalidInput(format!("Failed to read file from local location: {}", err))
@@ -1074,14 +1074,14 @@ async fn upload_file_to_net(safe: &mut Safe, path: &Path, dry_run: bool) -> Resu
 
     let mime_type = mime_guess::from_path(&path);
     match safe
-        .files_store_public_blob(&data, mime_type.first_raw(), dry_run)
+        .files_store_public_chunk(&data, mime_type.first_raw(), dry_run)
         .await
     {
         Ok(xorurl) => Ok(xorurl),
         Err(err) => {
             // Let's then upload it and set media-type to be simply raw content
             if let Error::InvalidMediaType(_) = err {
-                safe.files_store_public_blob(&data, None, dry_run).await
+                safe.files_store_public_chunk(&data, None, dry_run).await
             } else {
                 Err(err)
             }
@@ -1235,17 +1235,17 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_files_store_pub_blob() -> Result<()> {
+    async fn test_files_store_pub_chunk() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let random_blob_content: String =
+        let random_chunk_content: String =
             thread_rng().sample_iter(&Alphanumeric).take(20).collect();
 
         let file_xorurl = safe
-            .files_store_public_blob(random_blob_content.as_bytes(), None, false)
+            .files_store_public_chunk(random_chunk_content.as_bytes(), None, false)
             .await?;
 
-        let retrieved = retry_loop!(safe.files_get_public_blob(&file_xorurl, None));
-        assert_eq!(retrieved, random_blob_content.as_bytes());
+        let retrieved = retry_loop!(safe.files_get_public_chunk(&file_xorurl, None));
+        assert_eq!(retrieved, random_chunk_content.as_bytes());
 
         Ok(())
     }
@@ -2581,7 +2581,7 @@ mod tests {
         let _ = retry_loop!(safe.fetch(&xorurl, None));
 
         let data = b"0123456789";
-        let file_xorurl = safe.files_store_public_blob(data, None, false).await?;
+        let file_xorurl = safe.files_store_public_chunk(data, None, false).await?;
         let new_filename = "/new_filename_test.md";
 
         let (version, new_processed_files, new_files_map) = safe
@@ -2622,7 +2622,7 @@ mod tests {
 
         // let's add another file but with the same name
         let data = b"9876543210";
-        let other_file_xorurl = safe.files_store_public_blob(data, None, false).await?;
+        let other_file_xorurl = safe.files_store_public_chunk(data, None, false).await?;
         let (version, new_processed_files, new_files_map) = safe
             .files_container_add(
                 &other_file_xorurl,

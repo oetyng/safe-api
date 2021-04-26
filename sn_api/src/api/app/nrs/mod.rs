@@ -123,7 +123,7 @@ impl Safe {
     /// # async_std::task::block_on(async {
     /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
     ///     let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-    ///     let file_xorurl = safe.files_store_public_blob(&vec![], None, false).await.unwrap();
+    ///     let file_xorurl = safe.files_store_public_chunk(&vec![], None, false).await.unwrap();
     ///     let (xorurl, _processed_entries, nrs_map_container) = safe.nrs_map_container_create(&rand_string, &file_xorurl, true, false, false).await.unwrap();
     ///     assert!(xorurl.contains("safe://"))
     /// # });
@@ -156,7 +156,7 @@ impl Safe {
                 let nrs_xorname = SafeUrl::from_nrsurl(&nrs_url)?.xorname();
                 debug!("XorName for \"{:?}\" is \"{:?}\"", &nrs_url, &nrs_xorname);
 
-                // Store the serialised NrsMap in a Public Blob
+                // Store the serialised NrsMap in a public chunk
                 let nrs_map_xorurl = self.store_nrs_map(&nrs_map).await?;
 
                 // Store the NrsMapContainer in a Public Sequence, putting the
@@ -233,7 +233,7 @@ impl Safe {
     /// # async_std::task::block_on(async {
     /// #   safe.connect("", Some("fake-credentials")).await.unwrap();
     ///     let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-    ///     let file_xorurl = safe.files_store_public_blob(&vec![], Some("text/plain"), false).await.unwrap();
+    ///     let file_xorurl = safe.files_store_public_chunk(&vec![], Some("text/plain"), false).await.unwrap();
     ///     let (xorurl, _processed_entries, _nrs_map) = safe.nrs_map_container_create(&rand_string, &file_xorurl, true, false, false).await.unwrap();
     ///     let (version, nrs_map_container) = safe.nrs_map_container_get(&xorurl).await.unwrap();
     ///     assert_eq!(version, 0);
@@ -285,7 +285,7 @@ impl Safe {
                 let nrs_map_xorurl = SafeUrl::from_url(&url)?;
 
                 // Using the NrsMap XOR-URL we can now fetch the NrsMap and deserialise it
-                let serialised_nrs_map = self.fetch_public_blob(&nrs_map_xorurl, None).await?;
+                let serialised_nrs_map = self.fetch_public_chunk(&nrs_map_xorurl, None).await?;
 
                 debug!("Nrs map v{} retrieved: {:?} ", version, &serialised_nrs_map);
                 let nrs_map =
@@ -314,10 +314,10 @@ impl Safe {
         }
     }
 
-    // Private helper to serialise an NrsMap and store it in a Public Blob
+    // Private helper to serialise an NrsMap and store it in a public chunk
     async fn store_nrs_map(&mut self, nrs_map: &NrsMap) -> Result<String> {
         // The NrsMapContainer is a Sequence where each NRS Map version is
-        // an entry containing the XOR-URL of the Blob that contains the serialised NrsMap.
+        // an entry containing the XOR-URL of the chunk that contains the serialised NrsMap.
         // TODO: use RDF format
         let serialised_nrs_map = serde_json::to_string(nrs_map).map_err(|err| {
             Error::Serialisation(format!(
@@ -327,7 +327,7 @@ impl Safe {
         })?;
 
         let nrs_map_xorurl = self
-            .files_store_public_blob(serialised_nrs_map.as_bytes(), None, false)
+            .files_store_public_chunk(serialised_nrs_map.as_bytes(), None, false)
             .await?;
 
         Ok(nrs_map_xorurl)

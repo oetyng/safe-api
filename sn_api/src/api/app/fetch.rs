@@ -50,7 +50,7 @@ pub enum SafeData {
         data_type: SafeDataType,
         resolved_from: String,
     },
-    PublicBlob {
+    PublicChunk {
         xorurl: String,
         xorname: XorName,
         data: Vec<u8>,
@@ -93,7 +93,7 @@ impl SafeData {
             SafeKey { xorurl, .. }
             | Wallet { xorurl, .. }
             | FilesContainer { xorurl, .. }
-            | PublicBlob { xorurl, .. }
+            | PublicChunk { xorurl, .. }
             | NrsMapContainer { xorurl, .. }
             | PublicSequence { xorurl, .. }
             | PrivateSequence { xorurl, .. } => xorurl.clone(),
@@ -106,7 +106,7 @@ impl SafeData {
             SafeKey { resolved_from, .. }
             | Wallet { resolved_from, .. }
             | FilesContainer { resolved_from, .. }
-            | PublicBlob { resolved_from, .. }
+            | PublicChunk { resolved_from, .. }
             | NrsMapContainer { resolved_from, .. }
             | PrivateSequence { resolved_from, .. }
             | PublicSequence { resolved_from, .. } => resolved_from.clone(),
@@ -130,7 +130,7 @@ impl Safe {
     ///
     ///     let safe_data = safe.fetch( &format!( "{}/test.md", &xorurl.replace("?v=0", "") ), None ).await.unwrap();
     ///     let data_string = match safe_data {
-    ///         SafeData::PublicBlob { data, .. } => {
+    ///         SafeData::PublicChunk { data, .. } => {
     ///             match String::from_utf8(data) {
     ///                 Ok(string) => string,
     ///                 Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
@@ -181,7 +181,7 @@ impl Safe {
     ///         )
     ///     };
     ///     match &inspected_content[1] {
-    ///         SafeData::PublicBlob { data, media_type, .. } => {
+    ///         SafeData::PublicChunk { data, media_type, .. } => {
     ///             assert_eq!(*media_type, Some("text/markdown".to_string()));
     ///             assert!(data.is_empty());
     ///         }
@@ -404,8 +404,8 @@ impl Safe {
                         };
                         Ok((safe_data, None))
                     }
-                    SafeDataType::PublicBlob => {
-                        self.retrieve_blob(&the_xor, retrieve_data, None, &metadata, range)
+                    SafeDataType::PublicChunk => {
+                        self.retrieve_chunk(&the_xor, retrieve_data, None, &metadata, range)
                             .await
                     }
                     SafeDataType::PublicSequence => {
@@ -457,8 +457,8 @@ impl Safe {
                 }
 
                 match the_xor.data_type() {
-                    SafeDataType::PublicBlob => {
-                        self.retrieve_blob(
+                    SafeDataType::PublicChunk => {
+                        self.retrieve_chunk(
                             &the_xor,
                             retrieve_data,
                             Some(media_type_str),
@@ -505,7 +505,7 @@ impl Safe {
         }
     }
 
-    async fn retrieve_blob(
+    async fn retrieve_chunk(
         &mut self,
         the_xor: &SafeUrl,
         retrieve_data: bool,
@@ -522,13 +522,13 @@ impl Safe {
 
         let data = if retrieve_data {
             self.safe_client
-                .get_public_blob(the_xor.xorname(), range)
+                .get_public_chunk(the_xor.xorname(), range)
                 .await?
         } else {
             vec![]
         };
 
-        let safe_data = SafeData::PublicBlob {
+        let safe_data = SafeData::PublicChunk {
             xorurl: the_xor.to_xorurl_string(),
             xorname: the_xor.xorname(),
             data,
@@ -760,18 +760,18 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_fetch_public_blob() -> Result<()> {
+    async fn test_fetch_public_chunk() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let data = b"Something super immutable";
         let xorurl = safe
-            .files_store_public_blob(data, Some("text/plain"), false)
+            .files_store_public_chunk(data, Some("text/plain"), false)
             .await?;
 
         let safe_url = SafeUrl::from_url(&xorurl)?;
         let content = retry_loop!(safe.fetch(&xorurl, None));
         assert!(
             content
-                == SafeData::PublicBlob {
+                == SafeData::PublicChunk {
                     xorurl: xorurl.clone(),
                     xorname: safe_url.xorname(),
                     data: data.to_vec(),
@@ -785,7 +785,7 @@ mod tests {
         let inspected_content = safe.inspect(&xorurl).await?;
         assert!(
             inspected_content[0]
-                == SafeData::PublicBlob {
+                == SafeData::PublicChunk {
                     xorurl: xorurl.clone(),
                     xorname: safe_url.xorname(),
                     data: vec![],
@@ -798,34 +798,34 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_fetch_range_public_blob() -> Result<()> {
+    async fn test_fetch_range_public_chunk() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let saved_data = b"Something super immutable";
         let size = saved_data.len();
         let xorurl = safe
-            .files_store_public_blob(saved_data, Some("text/plain"), false)
+            .files_store_public_chunk(saved_data, Some("text/plain"), false)
             .await?;
 
         // Fetch first half and match
         let fetch_first_half = Some((None, Some(size as u64 / 2)));
         let content = retry_loop!(safe.fetch(&xorurl, fetch_first_half));
 
-        if let SafeData::PublicBlob { data, .. } = &content {
+        if let SafeData::PublicChunk { data, .. } = &content {
             assert_eq!(data.clone(), saved_data[0..size / 2].to_vec());
         } else {
-            bail!("Content fetched is not a PublicBlob: {:?}", content);
+            bail!("Content fetched is not a PublicChunk: {:?}", content);
         }
 
         // Fetch second half and match
         let fetch_second_half = Some((Some(size as u64 / 2), Some(size as u64)));
         let content = safe.fetch(&xorurl, fetch_second_half).await?;
 
-        if let SafeData::PublicBlob { data, .. } = &content {
+        if let SafeData::PublicChunk { data, .. } = &content {
             assert_eq!(data.clone(), saved_data[size / 2..size].to_vec());
             Ok(())
         } else {
             Err(anyhow!(
-                "Content fetched is not a PublicBlob: {:?}",
+                "Content fetched is not a PublicChunk: {:?}",
                 content
             ))
         }
@@ -859,32 +859,32 @@ mod tests {
 
         // Fetch full file and match
         let content = retry_loop!(safe.fetch(&nrs_url, None));
-        if let SafeData::PublicBlob { data, .. } = &content {
+        if let SafeData::PublicChunk { data, .. } = &content {
             assert_eq!(data.clone(), file_data.clone());
         } else {
-            bail!("Content fetched is not a PublicBlob: {:?}", content);
+            bail!("Content fetched is not a PublicChunk: {:?}", content);
         }
 
         // Fetch first half and match
         let fetch_first_half = Some((None, Some(file_size as u64 / 2)));
         let content = safe.fetch(&nrs_url, fetch_first_half).await?;
 
-        if let SafeData::PublicBlob { data, .. } = &content {
+        if let SafeData::PublicChunk { data, .. } = &content {
             assert_eq!(data.clone(), file_data[0..file_size / 2].to_vec());
         } else {
-            bail!("Content fetched is not a PublicBlob: {:?}", content);
+            bail!("Content fetched is not a PublicChunk: {:?}", content);
         }
 
         // Fetch second half and match
         let fetch_second_half = Some((Some(file_size as u64 / 2), Some(file_size as u64)));
         let content = safe.fetch(&nrs_url, fetch_second_half).await?;
 
-        if let SafeData::PublicBlob { data, .. } = &content {
+        if let SafeData::PublicChunk { data, .. } = &content {
             assert_eq!(data.clone(), file_data[file_size / 2..file_size].to_vec());
             Ok(())
         } else {
             Err(anyhow!(
-                "Content fetched is not a PublicBlob: {:?}",
+                "Content fetched is not a PublicChunk: {:?}",
                 content
             ))
         }
@@ -935,7 +935,7 @@ mod tests {
             xorname,
             None,
             type_tag,
-            SafeDataType::PrivateBlob,
+            SafeDataType::PrivateChunk,
             SafeContentType::Raw,
             None,
             None,
@@ -950,7 +950,10 @@ mod tests {
                 bail!("Unxpected fetched content: {:?}", c)
             }
             Err(Error::ContentError(msg)) => {
-                assert_eq!(msg, "Data type 'PrivateBlob' not supported yet".to_string())
+                assert_eq!(
+                    msg,
+                    "Data type 'PrivateChunk' not supported yet".to_string()
+                )
             }
             other => bail!("Error returned is not the expected one: {:?}", other),
         };
@@ -958,7 +961,10 @@ mod tests {
         match safe.inspect(&xorurl).await {
             Ok(c) => Err(anyhow!("Unxpected fetched content: {:?}", c)),
             Err(Error::ContentError(msg)) => {
-                assert_eq!(msg, "Data type 'PrivateBlob' not supported yet".to_string());
+                assert_eq!(
+                    msg,
+                    "Data type 'PrivateChunk' not supported yet".to_string()
+                );
                 Ok(())
             }
             other => Err(anyhow!(
@@ -977,7 +983,7 @@ mod tests {
             xorname,
             None,
             type_tag,
-            SafeDataType::PrivateBlob,
+            SafeDataType::PrivateChunk,
             SafeContentType::MediaType("text/html".to_string()),
             None,
             None,
@@ -992,7 +998,10 @@ mod tests {
                 bail!("Unxpected fetched content: {:?}", c)
             }
             Err(Error::ContentError(msg)) => {
-                assert_eq!(msg, "Data type 'PrivateBlob' not supported yet".to_string())
+                assert_eq!(
+                    msg,
+                    "Data type 'PrivateChunk' not supported yet".to_string()
+                )
             }
             other => bail!("Error returned is not the expected one: {:?}", other),
         };
@@ -1000,7 +1009,10 @@ mod tests {
         match safe.inspect(&xorurl).await {
             Ok(c) => Err(anyhow!("Unxpected fetched content: {:?}", c)),
             Err(Error::ContentError(msg)) => {
-                assert_eq!(msg, "Data type 'PrivateBlob' not supported yet".to_string());
+                assert_eq!(
+                    msg,
+                    "Data type 'PrivateChunk' not supported yet".to_string()
+                );
                 Ok(())
             }
             other => Err(anyhow!(
@@ -1011,10 +1023,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_fetch_public_blob_with_path() -> Result<()> {
+    async fn test_fetch_public_chunk_with_path() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let data = b"Something super immutable";
-        let xorurl = safe.files_store_public_blob(data, None, false).await?;
+        let xorurl = safe.files_store_public_chunk(data, None, false).await?;
 
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         let path = "/some_relative_filepath";
@@ -1032,7 +1044,7 @@ mod tests {
 
         // test the same but a file with some media type
         let xorurl = safe
-            .files_store_public_blob(data, Some("text/plain"), false)
+            .files_store_public_chunk(data, Some("text/plain"), false)
             .await?;
 
         let mut safe_url = SafeUrl::from_url(&xorurl)?;

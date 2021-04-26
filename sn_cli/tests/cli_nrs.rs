@@ -34,7 +34,7 @@ fn gen_fake_target() -> Result<String> {
         xorname,
         None,
         0x00a5_3cde,
-        SafeDataType::PublicBlob,
+        SafeDataType::PublicChunk,
         SafeContentType::Raw,
         None,
         None,
